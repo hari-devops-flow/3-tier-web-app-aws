@@ -23,6 +23,12 @@ jobs:
         with:
           terraform_version: 1.10.2
 
+      # Install Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
       # Terraform Initialization
       - name: Terraform Init
         run: terraform init
