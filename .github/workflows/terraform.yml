@@ -23,6 +23,14 @@ jobs:
         with:
           terraform_version: 1.10.2
 
+      # AWS Credential Verification
+      - name: Verify AWS CLI Configuration
+        run: |
+          aws sts get-caller-identity
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       # AWS Configure
       - name: Configure AWS Credntials
         uses: aws-actions/configure-aws-credentials@v4
@@ -53,9 +61,17 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan
       
-      #Terraform Apply
+      # Terraform Apply
       - name: Terraform Apply
         # if: github.event_name == push
         run: terraform apply -auto-approve tfplan
+
+      # Store Terraform State file
+      - name: Upload Terraform State
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-state
+          path: terraform.tfstate
+
 
       
