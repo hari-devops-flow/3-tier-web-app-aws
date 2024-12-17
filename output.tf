@@ -1,11 +1,7 @@
 output "vpc_id" {
-  value = module.vpc.vpc_id
+  value = aws_vpc.sandbox_vpc.id
 }
 
 output "public_subnets" {
-  value = module.vpc.public_subnets
-}
-
-output "rds_endpoint" {
-  value = module.rds.endpoint
+  value = aws_subnet.web.cidr_block
 }
