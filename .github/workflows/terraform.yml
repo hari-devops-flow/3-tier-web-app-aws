@@ -29,6 +29,13 @@ jobs:
         with:
           node-version: '20'
 
+      # Download Available terraform.tfstate file
+      - name: Download terraform.tfstate file
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform.tfstate
+          path: ./terraform.tfstate
+
       # Terraform Initialization
       - name: Terraform Init
         run: terraform init
@@ -45,9 +52,15 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan
       
-      #Terraform Apply
+      # Terraform Apply
       - name: Terraform Apply
         # if: github.event_name == push
         run: terraform apply -auto-approve tfplan
 
+      # Terraform State management
+      - name: Save terraform.tfstate file
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform.tfstate
+          path: ./terraform.tfstate
       
