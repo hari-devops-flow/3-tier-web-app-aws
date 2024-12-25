@@ -7,11 +7,22 @@ resource "aws_vpc" "sandbox_vpc" {
   }
 }
 
-resource "aws_subnet" "web" {
-  cidr_block = var.public_subnet_cidr_1
-  vpc_id     = aws_vpc.sandbox_vpc.id
+resource "aws_subnet" "web_1" {
+  cidr_block        = var.public_subnet_cidr_1
+  vpc_id            = aws_vpc.sandbox_vpc.id
+  availability_zone = "us-east-1a"
   tags = {
     Name = "web_subnet_1"
+    Type = "public"
+  }
+}
+
+resource "aws_subnet" "web_2" {
+  cidr_block        = var.public_subnet_cidr_2
+  vpc_id            = aws_vpc.sandbox_vpc.id
+  availability_zone = "us-east-1b"
+  tags = {
+    Name = "web_subnet_2"
     Type = "public"
   }
 }
