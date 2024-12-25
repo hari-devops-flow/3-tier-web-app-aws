@@ -35,6 +35,7 @@ jobs:
         with:
           name: terraform.tfstate
           path: ./terraform.tfstate
+        continue-on-error: true
 
       # Terraform Initialization
       - name: Terraform Init
