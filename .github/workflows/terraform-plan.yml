@@ -1,0 +1,160 @@
+# .github/workflows/terraform-pipeline.yml
+
+name: "Terraform Plan Pipeline"
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - qa
+      - stg
+
+    paths:
+      - 'environments/**/*.tf'
+      - 'modules/**/*.tf'
+      - '.github/workflows/terraform-pipeline.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+      - qa
+      - stg
+    paths:
+      - 'environments/**/*.tf'
+      - 'modules/**/*.tf'
+      - '.github/workflows/terraform-plan.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy (dev, staging, prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  terraform-validate:
+    name: "Terraform Format & Validate"
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.4
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init (for validation)
+        id: init
+        run: |
+          cd environments/dev
+          terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: |
+          cd environments/dev
+          terraform validate
+
+      - name: Report Format Issues
+        if: steps.fmt.outcome == 'failure'
+        run: echo "::warning::Terraform formatting issues found. Run 'terraform fmt -recursive' to fix."
+
+  tfsec:
+    name: "TFSec Security Scan"
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run TFSec
+        uses: aquasecurity/tfsec-action@master
+        with:
+          soft_fail: true
+
+  terraform-plan:
+    name: "Terraform Plan"
+    needs: [terraform-validate, tfsec]
+    runs-on: self-hosted
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["%s"]', github.event.inputs.environment)) || fromJSON('["dev"]') }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.4
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-west-2
+          
+      - name: Terraform Init
+        id: init
+        run: |
+          cd environments/${{ matrix.environment }}
+          terraform init
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd environments/${{ matrix.environment }}
+          terraform plan -input=false -out=tfplan
+        continue-on-error: true
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ matrix.environment }}
+          path: environments/${{ matrix.environment }}/tfplan
+          retention-days: 5
+
+      - name: Post Plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('environments/${{ matrix.environment }}/terraform.plan.out', 'utf8');
+            const planSummary = `### Terraform Plan for ${{ matrix.environment }} environment
+            
+            <details><summary>Click to expand</summary>
+
+            \`\`\`terraform
+            ${output}
+            \`\`\`
+            
+            </details>
+            
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: planSummary
+            });

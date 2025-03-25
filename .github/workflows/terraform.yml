@@ -29,14 +29,6 @@ jobs:
         with:
           node-version: '20'
 
-      # Download Available terraform.tfstate file
-      - name: Download terraform.tfstate file
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform.tfstate
-          path: ./terraform.tfstate
-        continue-on-error: true
-
       # Terraform Initialization
       - name: Terraform Init
         run: terraform init
