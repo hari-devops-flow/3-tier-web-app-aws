@@ -1,6 +1,6 @@
 # .github/workflows/terraform-pipeline.yml
 
-name: "Terraform Pipeline"
+name: "Terraform Plan Pipeline"
 
 on:
   push:
